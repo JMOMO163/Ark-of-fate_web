@@ -37,6 +37,13 @@
             <el-icon><el-icon-user /></el-icon>
             <span>角色管理</span>
           </el-menu-item>
+          <el-menu-item 
+            v-if="isAdmin" 
+            index="/users"
+          >
+            <el-icon><el-icon-user-filled /></el-icon>
+            <span>用户管理</span>
+          </el-menu-item>
         </el-menu>
       </el-aside>
       <el-container>
@@ -88,7 +95,8 @@ import {
   DataLine as ElIconDataLine, 
   Document as ElIconDocument,
   User as ElIconUser,
-  Collection as ElIconCollection
+  Collection as ElIconCollection,
+  UserFilled as ElIconUserFilled
 } from '@element-plus/icons-vue'
 import LoginDialog from '@/components/LoginDialog.vue'
 
@@ -100,6 +108,7 @@ export default defineComponent({
     ElIconDocument,
     ElIconUser,
     ElIconCollection,
+    ElIconUserFilled,
     LoginDialog
   },
   setup() {
@@ -146,6 +155,8 @@ export default defineComponent({
       }
     }
 
+    const isAdmin = computed(() => store.state.user?.role === 'admin')
+
     return {
       isLoggedIn,
       username,
@@ -156,7 +167,8 @@ export default defineComponent({
       loginDialogVisible,
       showLoginDialog,
       handleLoginSuccess,
-      handleCommand
+      handleCommand,
+      isAdmin
     }
   }
 })

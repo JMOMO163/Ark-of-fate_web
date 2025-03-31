@@ -201,39 +201,29 @@ export default defineComponent({
     }
     
     const handleSubmit = async () => {
-      if (activeForm.value === 'login') {
-        await submitLogin()
-      } else if (activeForm.value === 'register') {
-        await submitRegister()
-      } else if (activeForm.value === 'forgot') {
-        await submitForgotPassword()
-      }
-    }
-    
-    const submitLogin = async () => {
-      if (!loginFormRef.value) return
-      
       try {
-        await loginFormRef.value.validate()
         loading.value = true
+        let res
         
-        const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginForm.value.account)
-        const loginData = {
-          email: isEmail ? loginForm.value.account : '',
-          phone: !isEmail ? loginForm.value.account : '',
-          password: loginForm.value.password
-        }
-        
-        const res = await login(loginData)
-        
-        if (res.code === 200) {
-          store.dispatch('login', {
-            token: res.data.token,
-            user: res.data.user
+        if (activeForm.value === 'login') {
+          // 登录处理
+          res = await login({
+            email: loginForm.value.account,
+            password: loginForm.value.password
           })
-          emit('login-success')
-          closeDialog()
-          ElMessage.success('登录成功')
+          
+          if (res.code === 200) {
+            store.dispatch('login', {
+              token: res.data.token,
+              user: res.data.user  // 确保后端返回的用户数据包含 role 字段
+            })
+            emit('login-success')
+            closeDialog()
+          }
+        } else if (activeForm.value === 'register') {
+          await submitRegister()
+        } else if (activeForm.value === 'forgot') {
+          await submitForgotPassword()
         }
       } catch (error: any) {
         console.error('登录失败:', error)

@@ -8,7 +8,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src')
-    }
+    },
+    extensions: ['.js', '.ts', '.vue']
   },
   server: {
     port: 3000,

@@ -2,6 +2,7 @@ import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router'
 import DefaultLayout from '@/layouts/DefaultLayout.vue'
 import Home from '@/views/Home.vue'
 import store from '@/store'
+import { ElMessage } from 'element-plus'
 
 const routes: Array<RouteRecordRaw> = [
   {
@@ -69,6 +70,16 @@ const routes: Array<RouteRecordRaw> = [
           title: '角色管理',
           requiresAuth: true
         }
+      },
+      {
+        path: 'users',
+        name: 'Users',
+        component: () => import('@/views/Users.vue'),
+        meta: {
+          title: '用户管理',
+          requiresAuth: true,
+          requiresAdmin: true
+        }
       }
     ]
   }
@@ -88,6 +99,10 @@ router.beforeEach((to, from, next) => {
     if (!store.getters.isAuthenticated) {
       // 如果需要登录但未登录，重定向到首页
       next({ path: '/' })
+    } else if (to.matched.some(record => record.meta.requiresAdmin) && !store.getters.isAdmin) {
+      // 如果需要管理员权限但用户不是管理员
+      next({ path: '/' })
+      ElMessage.warning('该页面需要管理员权限')
     } else {
       next()
     }

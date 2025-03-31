@@ -182,6 +182,16 @@
         <el-form-item label="武器等级" prop="equipmentLevels.weapon">
           <el-input-number v-model="form.equipmentLevels.weapon" :min="0" placeholder="请输入武器等级" />
         </el-form-item>
+        <el-form-item label="副本" prop="dungeon">
+          <el-select v-model="form.dungeon" placeholder="请选择副本">
+            <el-option
+              v-for="dungeon in dungeons"
+              :key="dungeon._id"
+              :label="dungeon.name"
+              :value="dungeon._id"
+            />
+          </el-select>
+        </el-form-item>
       </el-form>
       <template #footer>
         <div class="dialog-footer">
@@ -411,7 +421,9 @@ import {
   CharacterData 
 } from '@/api/character'
 import { getGameAccounts } from '@/api/gameAccount'
-import { getDungeons } from '@/api/dungeon'
+import { getAllDungeons } from '@/api/statistics'
+import type { GameAccountData } from '@/api/gameAccount'
+import type { DungeonData } from '@/api/statistics'
 import { 
   getDungeonRecords, 
   createDungeonRecord, 
@@ -426,14 +438,14 @@ export default defineComponent({
     const dialogVisible = ref(false)
     const dialogType = ref<'add' | 'edit'>('add')
     const currentId = ref('')
-    const characters = ref<any[]>([])
-    const gameAccounts = ref([])
+    const characters = ref<CharacterData[]>([])
+    const gameAccounts = ref<GameAccountData[]>([])
     const formRef = ref<FormInstance>()
 
     const recordDialogVisible = ref(false)
     const recordFormRef = ref<FormInstance>()
-    const currentCharacter = ref<any>(null)
-    const dungeons = ref<any[]>([])
+    const currentCharacter = ref<CharacterData | null>(null)
+    const dungeons = ref<DungeonData[]>([])
     const completedDungeons = ref<string[]>([])
 
     // 搜索表单
@@ -560,15 +572,14 @@ export default defineComponent({
       }
     }
 
-    // 获取副本列表
+    // 获取所有副本
     const fetchDungeons = async () => {
       try {
-        const res = await getDungeons()
-        if (res.code === 200) {
-          dungeons.value = res.data.dungeons
-        }
+        const res = await getAllDungeons()
+        dungeons.value = res.data.dungeons
       } catch (error) {
         console.error('获取副本列表失败:', error)
+        ElMessage.error('获取副本列表失败')
       }
     }
 
@@ -616,7 +627,7 @@ export default defineComponent({
     }
 
     // 编辑角色
-    const handleEdit = (row: any) => {
+    const handleEdit = (row: CharacterData) => {
       dialogType.value = 'edit'
       currentId.value = row._id
       form.name = row.name
@@ -628,7 +639,7 @@ export default defineComponent({
     }
 
     // 删除角色
-    const handleDelete = (row: any) => {
+    const handleDelete = (row: CharacterData) => {
       ElMessageBox.confirm(
         `确定要删除角色 ${row.name} 吗？`,
         '提示',
@@ -698,7 +709,7 @@ export default defineComponent({
     }
 
     // 修改打开添加记录对话框方法
-    const handleAddRecord = async (row: any) => {
+    const handleAddRecord = async (row: CharacterData) => {
       currentCharacter.value = row
       // 获取已完成副本列表
       await fetchCompletedDungeons(row._id)
@@ -757,7 +768,7 @@ export default defineComponent({
     })
 
     // 查看角色详情
-    const handleViewDetails = async (row: any) => {
+    const handleViewDetails = async (row: CharacterData) => {
       currentCharacter.value = row
       detailsDialogVisible.value = true
       await fetchDungeonRecords(row._id)
@@ -834,10 +845,17 @@ export default defineComponent({
       fetchCharacters()
     })
 
-    onMounted(() => {
-      fetchGameAccounts()
-      fetchCharacters()
-      fetchDungeons()
+    onMounted(async () => {
+      loading.value = true
+      try {
+        await Promise.all([
+          fetchCharacters(),
+          fetchGameAccounts(),
+          fetchDungeons()
+        ])
+      } finally {
+        loading.value = false
+      }
     })
     
     return {

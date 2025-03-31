@@ -1,12 +1,20 @@
 import { createStore } from 'vuex'
 
+interface UserState {
+  _id: string;
+  username: string;
+  email: string;
+  role: 'user' | 'admin';
+}
+
 export default createStore({
   state: {
-    user: null,
+    user: null as UserState | null,
     token: localStorage.getItem('token') || ''
   },
   getters: {
-    isAuthenticated: state => !!state.token
+    isAuthenticated: state => !!state.token,
+    isAdmin: state => state.user?.role === 'admin'
   },
   mutations: {
     setToken(state, token) {

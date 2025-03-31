@@ -37,4 +37,11 @@ export function getStatistics(params?: StatisticsQuery) {
     method: 'get',
     params
   })
+}
+
+export function getAllDungeons() {
+  return request<{ dungeons: DungeonData[] }>({
+    url: '/api/statistics/dungeons/all',
+    method: 'get'
+  })
 } 
