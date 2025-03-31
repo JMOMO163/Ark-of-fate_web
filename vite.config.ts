@@ -16,7 +16,7 @@ export default defineConfig({
     open: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:8023',
+        target: 'http://127.0.0.1:8023',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
         timeout: 30000,
