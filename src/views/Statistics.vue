@@ -154,7 +154,7 @@ export default defineComponent({
     const statistics = ref<StatisticsData | null>(null)
     const gameAccounts = ref<any[]>([])
     const store = useStore()
-    const goldRate = computed(() => store.state.user?.goldRate || 1500)
+    const goldRate = computed(() => store.state.user?.goldRate || 0)
     
     // 筛选表单
     const filterForm = ref({

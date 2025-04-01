@@ -210,66 +210,59 @@
     <!-- 添加副本记录对话框 -->
     <el-dialog
       v-model="recordDialogVisible"
-      :title="'添加副本记录 - ' + currentCharacter?.name"
-      width="500px"
+      title="添加副本记录"
+      width="800px"
     >
       <el-form
         ref="recordFormRef"
         :model="recordForm"
         :rules="recordRules"
-        label-width="100px"
+        label-width="120px"
       >
-        <el-form-item label="选择副本" prop="dungeonId">
-          <el-select v-model="recordForm.dungeonId" placeholder="请选择副本">
-            <el-option
-              v-for="dungeon in dungeons"
-              :key="dungeon._id"
-              :label="dungeon.name"
-              :value="dungeon._id"
-              :disabled="completedDungeons.includes(dungeon._id)"
-            >
-              <span :style="{ color: completedDungeons.includes(dungeon._id) ? '#C0C4CC' : '' }">
-                {{ dungeon.name }}
-              </span>
-              <span v-if="completedDungeons.includes(dungeon._id)" style="float: right; color: #C0C4CC">
-                已完成
-              </span>
-            </el-option>
-          </el-select>
+        <el-form-item label="角色">
+          <el-input v-model="currentCharacter.name" disabled />
         </el-form-item>
-        <el-form-item label="单人模式" prop="isSolo">
+        
+        <!-- 将下拉选择框改为transfer组件实现多选 -->
+        <el-form-item label="选择副本" prop="dungeonIds">
+          <el-transfer
+            v-model="recordForm.dungeonIds"
+            :data="dungeonTransferData"
+            :titles="['可选副本', '已选副本']"
+            :button-texts="['移除', '添加']"
+            filterable
+            :filter-method="filterDungeonMethod"
+            filter-placeholder="请输入副本名称搜索"
+          >
+            <template #default="{ option }">
+              <div>{{ option.label }} (装等: {{ option.itemLevel }})</div>
+            </template>
+          </el-transfer>
+        </el-form-item>
+        
+        <!-- 公共设置区域 -->
+        <el-divider content-position="center">公共设置</el-divider>
+        <el-form-item label="单人模式">
           <el-switch v-model="recordForm.isSolo" />
         </el-form-item>
-        <el-form-item label="是否通关" prop="isCompleted">
+        <el-form-item label="已完成">
           <el-switch v-model="recordForm.isCompleted" />
         </el-form-item>
-        <el-form-item
-          v-if="!recordForm.isCompleted"
-          label="进度描述"
-          prop="progress"
-        >
-          <el-input
-            v-model="recordForm.progress"
-            type="textarea"
-            placeholder="请描述副本进度"
-          />
+        <el-form-item v-if="!recordForm.isCompleted" label="进度">
+          <el-input v-model="recordForm.progress" placeholder="例如：2/3" />
         </el-form-item>
-        <el-form-item label="获得收益" prop="hasReward">
+        <el-form-item label="获得奖励">
           <el-switch v-model="recordForm.hasReward" />
         </el-form-item>
-        <el-form-item label="有艾斯特" prop="hasEster">
+        <el-form-item label="获得艾斯特">
           <el-switch v-model="recordForm.hasEster" />
         </el-form-item>
       </el-form>
       <template #footer>
         <div class="dialog-footer">
           <el-button @click="recordDialogVisible = false">取消</el-button>
-          <el-button
-            type="primary"
-            :loading="submitLoading"
-            @click="handleSubmitRecord"
-          >
-            确定
+          <el-button type="primary" :loading="submitLoading" @click="handleSubmitRecord">
+            {{ recordForm.dungeonIds.length > 1 ? `添加 ${recordForm.dungeonIds.length} 条记录` : '添加记录' }}
           </el-button>
         </div>
       </template>
@@ -471,11 +464,11 @@ export default defineComponent({
     })
 
     const recordForm = reactive({
-      dungeonId: '',
+      dungeonIds: [],
       isSolo: false,
-      isCompleted: false,
+      isCompleted: true,
       progress: '',
-      hasReward: false,
+      hasReward: true,
       hasEster: false
     })
 
@@ -514,22 +507,8 @@ export default defineComponent({
     }
 
     const recordRules = {
-      dungeonId: [
-        { required: true, message: '请选择副本', trigger: 'change' }
-      ],
-      progress: [
-        { 
-          required: true, 
-          message: '请描述副本进度', 
-          trigger: 'blur',
-          validator: (rule: any, value: string, callback: Function) => {
-            if (!recordForm.isCompleted && !value) {
-              callback(new Error('请描述副本进度'))
-            } else {
-              callback()
-            }
-          }
-        }
+      dungeonIds: [
+        { type: 'array', required: true, message: '请至少选择一个副本', trigger: 'change' }
       ]
     }
 
@@ -708,48 +687,107 @@ export default defineComponent({
       searchForm.minItemLevel = value.replace(/[^\d]/g, '')
     }
 
+    // 新增：为transfer组件准备数据
+    const dungeonTransferData = computed(() => {
+      return dungeons.value.map(dungeon => ({
+        key: dungeon._id,
+        label: dungeon.name,
+        itemLevel: dungeon.itemLevel,
+        disabled: completedDungeons.value.includes(dungeon._id) // 可选：已完成的副本置灰
+      }))
+    })
+
+    // 新增：搜索副本的过滤方法
+    const filterDungeonMethod = (query, item) => {
+      return item.label.toLowerCase().includes(query.toLowerCase())
+    }
+
     // 修改打开添加记录对话框方法
-    const handleAddRecord = async (row: CharacterData) => {
+    const handleAddRecord = async (row) => {
       currentCharacter.value = row
       // 获取已完成副本列表
       await fetchCompletedDungeons(row._id)
       
-      recordForm.dungeonId = ''
+      // 重置表单
+      recordForm.dungeonIds = []
       recordForm.isSolo = false
-      recordForm.isCompleted = true // 默认已通关
+      recordForm.isCompleted = true
       recordForm.progress = ''
-      recordForm.hasReward = true // 默认已获得收益
+      recordForm.hasReward = true
       recordForm.hasEster = false
+      
       recordDialogVisible.value = true
     }
 
-    // 提交副本记录
+    // 修改提交记录方法，支持创建多条记录
     const handleSubmitRecord = async () => {
       if (!recordFormRef.value) return
       
-      await recordFormRef.value.validate(async (valid: boolean) => {
+      recordFormRef.value.validate(async (valid) => {
         if (valid) {
+          if (recordForm.dungeonIds.length === 0) {
+            ElMessage.warning('请至少选择一个副本')
+            return
+          }
+          
           try {
             submitLoading.value = true
-            const res = await createDungeonRecord({
-              characterId: currentCharacter.value._id,
-              characterName: currentCharacter.value.name,
-              gameAccountId: currentCharacter.value.gameAccount._id,
-              gameAccountName: currentCharacter.value.gameAccount.accountName,
-              dungeonId: recordForm.dungeonId,
-              isSolo: recordForm.isSolo,
-              isCompleted: recordForm.isCompleted,
-              progress: recordForm.isCompleted ? undefined : recordForm.progress,
-              hasReward: recordForm.hasReward,
-              hasEster: recordForm.hasEster
-            })
             
-            if (res.code === 200) {
-              ElMessage.success('添加记录成功')
-              recordDialogVisible.value = false
+            // 记录成功和失败的数量
+            let successCount = 0
+            let failCount = 0
+            
+            // 遍历选中的副本，创建多条记录
+            for (const dungeonId of recordForm.dungeonIds) {
+              try {
+                // 找到当前处理的副本信息，用于显示
+                const dungeonInfo = dungeons.value.find(d => d._id === dungeonId)
+                
+                // 创建单条记录
+                const res = await createDungeonRecord({
+                  characterId: currentCharacter.value._id,
+                  characterName: currentCharacter.value.name,
+                  gameAccountId: currentCharacter.value.gameAccount._id,
+                  gameAccountName: currentCharacter.value.gameAccount.accountName,
+                  dungeonId: dungeonId,
+                  isSolo: recordForm.isSolo,
+                  isCompleted: recordForm.isCompleted,
+                  progress: recordForm.isCompleted ? undefined : recordForm.progress,
+                  hasReward: recordForm.hasReward,
+                  hasEster: recordForm.hasEster
+                })
+                
+                if (res.code === 200) {
+                  successCount++
+                } else {
+                  failCount++
+                  console.error(`添加副本 ${dungeonInfo?.name || dungeonId} 记录失败:`, res.message)
+                }
+              } catch (error) {
+                failCount++
+                console.error(`添加副本记录异常:`, error)
+              }
+            }
+            
+            // 显示结果消息
+            if (successCount > 0 && failCount === 0) {
+              ElMessage.success(`成功添加 ${successCount} 条副本记录`)
+            } else if (successCount > 0 && failCount > 0) {
+              ElMessage.warning(`成功添加 ${successCount} 条记录，${failCount} 条记录失败`)
+            } else {
+              ElMessage.error('添加记录失败')
+            }
+            
+            // 关闭对话框并刷新
+            recordDialogVisible.value = false
+            
+            // 重新获取已完成副本列表
+            if (successCount > 0) {
+              await fetchCompletedDungeons(currentCharacter.value._id)
             }
           } catch (error) {
-            console.error('提交副本记录失败:', error)
+            console.error('添加副本记录失败:', error)
+            ElMessage.error('添加记录失败')
           } finally {
             submitLoading.value = false
           }
@@ -896,7 +934,9 @@ export default defineComponent({
       pageSize,
       total,
       handleSizeChange,
-      handleCurrentChange
+      handleCurrentChange,
+      dungeonTransferData,
+      filterDungeonMethod
     }
   }
 })
@@ -982,5 +1022,43 @@ export default defineComponent({
   margin-top: 20px;
   display: flex;
   justify-content: flex-end;
+}
+
+/* 优化transfer组件的样式 - 整体缩小高度40px */
+:deep(.el-transfer) {
+  display: flex;
+  justify-content: center;
+}
+
+/* 优化transfer组件中间按钮的样式 */
+:deep(.el-transfer__buttons) {
+  padding: 0 15px;  /* 增加左右内边距 */
+  display: flex;
+  flex-direction: column;  /* 保持垂直排列 */
+  justify-content: center;
+  gap: 10px;  /* 按钮之间的间距 */
+}
+
+:deep(.el-transfer__button) {
+  width: 80px;  /* 设置固定宽度代替最小宽度 */
+  height: 36px;  /* 设置固定高度 */
+  padding: 0;  /* 移除内边距，由固定宽高控制 */
+  font-weight: bold;  /* 字体加粗 */
+  display: flex;  /* 使用flex布局居中内容 */
+  justify-content: center;  /* 水平居中 */
+  align-items: center;  /* 垂直居中 */
+}
+
+:deep(.el-transfer-panel) {
+  width: 45%;
+  min-height: 310px;  /* 从350px减少到310px */
+}
+
+:deep(.el-transfer-panel__body) {
+  height: 260px;  /* 从300px减少到260px */
+}
+
+:deep(.el-transfer-panel__list.is-filterable) {
+  height: 194px;  /* 从234px减少到194px */
 }
 </style> 
