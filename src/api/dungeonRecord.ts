@@ -40,4 +40,21 @@ export function getDungeonRecordStats(characterId: string) {
     url: `/api/dungeon-records/stats/${characterId}`,
     method: 'get'
   })
+}
+
+// 更新副本记录
+export function updateDungeonRecord(id: string, data: Partial<DungeonRecordData>) {
+  return request({
+    url: `/api/dungeon-records/record/${id}`,
+    method: 'put',
+    data
+  })
+}
+
+// 删除副本记录
+export function deleteDungeonRecord(id: string) {
+  return request({
+    url: `/api/dungeon-records/record/${id}`,
+    method: 'delete'
+  })
 } 

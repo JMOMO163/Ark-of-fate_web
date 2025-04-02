@@ -182,16 +182,6 @@
         <el-form-item label="武器等级" prop="equipmentLevels.weapon">
           <el-input-number v-model="form.equipmentLevels.weapon" :min="0" placeholder="请输入武器等级" />
         </el-form-item>
-        <el-form-item label="副本" prop="dungeon">
-          <el-select v-model="form.dungeon" placeholder="请选择副本">
-            <el-option
-              v-for="dungeon in dungeons"
-              :key="dungeon._id"
-              :label="dungeon.name"
-              :value="dungeon._id"
-            />
-          </el-select>
-        </el-form-item>
       </el-form>
       <template #footer>
         <div class="dialog-footer">
@@ -396,9 +386,57 @@
                 {{ formatDate(scope.row.createdAt) }}
               </template>
             </el-table-column>
+            <el-table-column label="操作" width="160" fixed="right">
+              <template #default="scope">
+                <el-button size="small" type="primary" @click="handleEditRecord(scope.row)">修改</el-button>
+                <el-button size="small" type="danger" @click="handleDeleteRecord(scope.row)">删除</el-button>
+              </template>
+            </el-table-column>
           </el-table>
         </el-card>
       </div>
+    </el-dialog>
+
+    <!-- 添加修改记录对话框 -->
+    <el-dialog
+      v-model="editRecordDialogVisible"
+      title="修改副本记录"
+      width="600px"
+    >
+      <el-form
+        ref="editRecordFormRef"
+        :model="editRecordForm"
+        :rules="recordRules"
+        label-width="120px"
+      >
+        <el-form-item label="角色">
+          <el-input v-model="currentCharacter.name" disabled />
+        </el-form-item>
+        <el-form-item label="副本">
+          <el-input v-model="editRecordForm.dungeonName" disabled />
+        </el-form-item>
+        <el-form-item label="单人模式">
+          <el-switch v-model="editRecordForm.isSolo" />
+        </el-form-item>
+        <el-form-item label="已完成">
+          <el-switch v-model="editRecordForm.isCompleted" />
+        </el-form-item>
+        <el-form-item v-if="!editRecordForm.isCompleted" label="进度">
+          <el-input v-model="editRecordForm.progress" placeholder="例如：2/3" />
+        </el-form-item>
+        <el-form-item label="获得奖励">
+          <el-switch v-model="editRecordForm.hasReward" />
+        </el-form-item>
+        <el-form-item label="获得艾斯特">
+          <el-switch v-model="editRecordForm.hasEster" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="editRecordDialogVisible = false">取消</el-button>
+          <el-button type="primary" :loading="submitLoading" @click="handleSubmitEditRecord">确定</el-button>
+        </div>
+      </template>
     </el-dialog>
   </div>
 </template>
@@ -420,7 +458,9 @@ import type { DungeonData } from '@/api/statistics'
 import { 
   getDungeonRecords, 
   createDungeonRecord, 
-  getCompletedDungeons 
+  getCompletedDungeons,
+  updateDungeonRecord,
+  deleteDungeonRecord
 } from '@/api/dungeonRecord'
 
 export default defineComponent({
@@ -883,6 +923,94 @@ export default defineComponent({
       fetchCharacters()
     })
 
+    // 新增：修改副本记录
+    const editRecordDialogVisible = ref(false)
+    const editRecordFormRef = ref<FormInstance>()
+    const currentRecordId = ref('')
+    const editRecordForm = reactive({
+      dungeonName: '',
+      isSolo: false,
+      isCompleted: true,
+      progress: '',
+      hasReward: true,
+      hasEster: false
+    })
+
+    // 处理编辑记录
+    const handleEditRecord = (record) => {
+      currentRecordId.value = record._id
+      editRecordForm.dungeonName = record.dungeon.name
+      editRecordForm.isSolo = record.isSolo
+      editRecordForm.isCompleted = record.isCompleted
+      editRecordForm.progress = record.progress || ''
+      editRecordForm.hasReward = record.hasReward
+      editRecordForm.hasEster = record.hasEster
+      editRecordDialogVisible.value = true
+    }
+
+    // 提交编辑记录
+    const handleSubmitEditRecord = async () => {
+      if (!editRecordFormRef.value) return
+      
+      await editRecordFormRef.value.validate(async (valid) => {
+        if (valid) {
+          try {
+            submitLoading.value = true
+            
+            const data = {
+              isSolo: editRecordForm.isSolo,
+              isCompleted: editRecordForm.isCompleted,
+              progress: !editRecordForm.isCompleted ? editRecordForm.progress : '',
+              hasReward: editRecordForm.hasReward,
+              hasEster: editRecordForm.hasEster
+            }
+            
+            const res = await updateDungeonRecord(currentRecordId.value, data)
+            
+            if (res.code === 200) {
+              ElMessage.success('更新记录成功')
+              editRecordDialogVisible.value = false
+              // 重新获取记录列表
+              await fetchDungeonRecords(currentCharacter.value._id)
+            }
+          } catch (error) {
+            console.error('更新副本记录失败:', error)
+            ElMessage.error('更新副本记录失败')
+          } finally {
+            submitLoading.value = false
+          }
+        }
+      })
+    }
+
+    // 处理删除记录
+    const handleDeleteRecord = (record) => {
+      ElMessageBox.confirm(
+        `确定要删除副本"${record.dungeon.name}"的记录吗？此操作不可恢复。`,
+        '删除确认',
+        {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }
+      ).then(async () => {
+        try {
+          const res = await deleteDungeonRecord(record._id)
+          
+          if (res.code === 200) {
+            ElMessage.success('删除记录成功')
+            // 重新获取记录列表
+            await fetchDungeonRecords(currentCharacter.value._id)
+          }
+        } catch (error) {
+          console.error('删除副本记录失败:', error)
+          ElMessage.error('删除副本记录失败')
+        }
+      }).catch(() => {
+        // 取消删除，不执行任何操作
+      })
+    }
+
     onMounted(async () => {
       loading.value = true
       try {
@@ -936,7 +1064,13 @@ export default defineComponent({
       handleSizeChange,
       handleCurrentChange,
       dungeonTransferData,
-      filterDungeonMethod
+      filterDungeonMethod,
+      editRecordDialogVisible,
+      editRecordFormRef,
+      editRecordForm,
+      handleEditRecord,
+      handleSubmitEditRecord,
+      handleDeleteRecord
     }
   }
 })
