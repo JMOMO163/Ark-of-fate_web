@@ -20,6 +20,7 @@ service.interceptors.request.use(
     config.headers = config.headers || {}
     // 添加必要的请求头
     config.headers['Content-Type'] = 'application/json'
+    config.headers['Access-Control-Allow-Origin'] = '*'
     return config
   },
   error => {
