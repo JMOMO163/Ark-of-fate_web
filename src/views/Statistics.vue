@@ -133,7 +133,7 @@ import VChart from 'vue-echarts'
 import { getStatistics, StatisticsData } from '@/api/statistics'
 import { ElMessage } from 'element-plus'
 import { getGameAccounts } from '@/api/gameAccount'
-import { useStore } from 'vuex'
+import { getInfo } from '@/api/auth'
 
 use([
   CanvasRenderer,
@@ -153,8 +153,7 @@ export default defineComponent({
     const loading = ref(false)
     const statistics = ref<StatisticsData | null>(null)
     const gameAccounts = ref<any[]>([])
-    const store = useStore()
-    const goldRate = computed(() => store.state.user?.goldRate || 0)
+    const goldRate = ref(1)
     
     // 筛选表单
     const filterForm = ref({
@@ -245,13 +244,12 @@ export default defineComponent({
       tooltip: {
         trigger: 'axis',
         formatter: function(params: any[]) {
-          const goldRate = store.state.user?.goldRate || 1500
           let result = `${params[0].name}<br/>`
           params.forEach(param => {
             if (param.seriesName === '使用次数') {
               result += `${param.seriesName}: ${param.value} 次<br/>`
             } else if (param.seriesName === '交易金收益') {
-              const rmbValue = (param.value / goldRate).toFixed(2)
+              const rmbValue = (param.value / goldRate.value).toFixed(2)
               result += `${param.seriesName}: ${param.value} 金 ≈${rmbValue}元<br/>`
             } else {
               result += `${param.seriesName}: ${param.value} 金<br/>`
@@ -329,12 +327,11 @@ export default defineComponent({
       tooltip: {
         trigger: 'axis',
         formatter: function(params: any[]) {
-          const goldRate = store.state.user?.goldRate || 1500
           let result = `${params[0].name}<br/>`
           params.forEach(param => {
             const goldValue = param.value
             if (param.seriesName === '交易金收益') {
-              const rmbValue = (goldValue / goldRate).toFixed(2)
+              const rmbValue = (goldValue / goldRate.value).toFixed(2)
               result += `${param.seriesName}: ${goldValue} 金 ≈${rmbValue}元<br/>`
             } else {
               result += `${param.seriesName}: ${goldValue} 金<br/>`
@@ -417,9 +414,11 @@ export default defineComponent({
         loading.value = true
         const params = {
           gameAccountId: filterForm.value.gameAccountId,
-          startDate: filterForm.value.dateRange[0],
-          endDate: filterForm.value.dateRange[1],
           recordType: filterForm.value.recordType
+        }
+        if (filterForm.value.dateRange && filterForm.value.dateRange.length === 2) {
+          params.startDate = filterForm.value.dateRange[0]
+          params.endDate = filterForm.value.dateRange[1]
         }
         const res = await getStatistics(params)
         if (res.code === 200) {
@@ -433,9 +432,38 @@ export default defineComponent({
       }
     }
 
-    onMounted(() => {
-      fetchGameAccounts()
-      fetchStatistics()
+    // 添加获取用户信息的方法
+    const fetchUserProfile = async () => {
+      try {
+        const res = await getInfo()
+        if (res.code === 200) {
+          // 使用API返回的goldRate
+          goldRate.value = res.data.goldRate || 1
+          console.log('获取到金币兑换比率:', goldRate.value)
+        }
+      } catch (error) {
+        console.error('获取用户信息失败:', error)
+        ElMessage.error('获取用户信息失败')
+      }
+    }
+
+    // 在刷新统计数据的方法中，不需要再从store获取goldRate
+    const handleRefresh = async () => {
+      loading.value = true
+      try {
+        await fetchStatistics()
+        ElMessage.success('统计数据已刷新')
+      } catch (error) {
+        console.error('刷新统计数据失败:', error)
+      } finally {
+        loading.value = false
+      }
+    }
+
+    onMounted(async () => {
+      await fetchGameAccounts()
+      await fetchUserProfile()
+      await fetchStatistics()
     })
 
     return {

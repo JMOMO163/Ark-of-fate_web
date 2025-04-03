@@ -12,11 +12,16 @@ export default defineConfig({
     extensions: ['.js', '.ts', '.vue']
   },
   server: {
-    port: 3000,
+    port: 8001,
     open: true,
+    allowedHosts: [
+      'uk.frp.one',
+      'shui.wangwang351.asia',
+      'localhost'
+    ],
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:8023',
+        target: 'http://uk.frp.one:58023',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
         timeout: 30000,
